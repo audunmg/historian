@@ -4,12 +4,14 @@ Quite early stages.
 
 Requires lua (5.4 i think?) and lsqlite3 for lua.
 
+lsqlite3 can be installed from luarocks or aur/lua/lsqlite3 on arch.
+
+
 To install, clone repo and add to .bashrc:
 
 ```
 export HISTORIANDIR=replace this with path to cloned repo
 export HISTDB=$HOME/.bashhistory.db
-
 ```
 
 The database is not initialized automatically. To initialize the database, run: 
