@@ -23,7 +23,9 @@ sqlite "$HISTDB" 'CREATE TABLE bashhistory(lines INTEGER, columns INTEGER, ssh_c
 
 ## How it works
 
-It captures the history using readline trickery and inserting it into a sqlite3 database, using lua because it was just way faster than bash scripting. Since I already used lua for inserts, I just reused it for querying the database.
+It captures the history using readline trickery and inserting it into a sqlite3 database, using lua because it was just way faster than bash scripting. This is because with lua I can do inserts with prepared statements, and escaping will not be a problem. With bash, I can't use prepared statements, and need to carefully escape stuff and I had no patience for that.
+
+Since I already used lua for inserts, I just reused it for querying the database.
 
 It first was implemented using the bash DEBUG trap, but that actually doesn't store the whole line being ran, and sometimes was run several times, for example `ls| cat` would run the trap twice, once for `ls`, once for `cat`, but the `.bash_history` would contain `ls| cat`. Not ideal. Readline trickery actually captures history correctly.
 
