@@ -5,38 +5,34 @@ local sqlite3 = require("lsqlite3")
 
 local db = assert(sqlite3.open(assert(os.getenv('HISTDB'))))
 
-if os.getenv('SSH_CONNECTION') then
-insert_stmt = assert(db:prepare([[
-INSERT INTO bashhistory 
-(time, command, pwd, tty, lines, columns, ssh_connection)
-VALUES
-(julianday('now'), ?, ?, ?, ?, ?, ?)
-]]))
+-- Map environment sql table names to environment variables
+vars = {
+    bash_pid = "BASH_PID",
+    columns = "COLUMNS",
+    command = "READLINE_LINE",
+    history_lineno = "HISTORY_LINE",
+    lines = "LINES",
+    pwd = "PWD",
+    session_start = "SESSION_START",
+    tty = "TTY",
+    ssh_connection = "SSH_CONNECTION"
+}
 
-insert_stmt:bind_values(
-assert(os.getenv('READLINE_LINE')),
-assert(os.getenv('PWD')),
-assert(os.getenv('TTY')),
-assert(os.getenv('LINES')),
-assert(os.getenv('COLUMNS')),
-assert(os.getenv('SSH_CONNECTION'))
-)
-
-else
-insert_stmt = assert(db:prepare([[
-INSERT INTO bashhistory 
-(time, command, pwd, tty, lines, columns)
-VALUES
-(julianday('now'), ?, ?, ?, ?, ?)
-]]))
-
-insert_stmt:bind_values(
-assert(os.getenv('READLINE_LINE')),
-assert(os.getenv('PWD')),
-assert(os.getenv('TTY')),
-assert(os.getenv('LINES')),
-assert(os.getenv('COLUMNS'))
-)
+sqlnames = ""
+mark     = ""
+values = {}
+for k,v in pairs(vars) do
+  if (os.getenv(v)) then
+    sqlnames = sqlnames .. ", " .. k
+    mark     = mark .. ", ?"
+    table.insert( values, os.getenv(v) )
+  end
 end
+
+
+insert_stmt = db:prepare( "INSERT INTO bashhistory (time" .. sqlnames .. ") VALUES (julianday('now')" .. mark .. ")"  )
+
+insert_stmt:bind_values( table.unpack( values ) )
+
 insert_stmt:step()
 insert_stmt:reset()
