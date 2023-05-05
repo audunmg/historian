@@ -15,6 +15,7 @@ vars = {
     pwd = "PWD",
     session_start = "SESSION_START",
     tty = "TTY",
+    hostname = "HOSTNAME",
     ssh_connection = "SSH_CONNECTION"
 }
 

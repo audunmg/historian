@@ -1,7 +1,7 @@
 #!/bin/bash
 
 
-# CREATE TABLE bashhistory( lines INTEGER, columns INTEGER, session_start INTEGER, bash_pid INTEGER, ssh_connection TEXT, tty TEXT, time REAL, command TEXT, history_lineno INTEGER, pwd TEXT, return_value INTEGER, duration_msec INTEGER, id INTEGER PRIMARY KEY ASC);
+# CREATE TABLE bashhistory( lines INTEGER, columns INTEGER, session_start INTEGER, bash_pid INTEGER, ssh_connection TEXT, hostname TEXT, tty TEXT, time REAL, command TEXT, history_lineno INTEGER, pwd TEXT, return_value INTEGER, duration_msec INTEGER, id INTEGER PRIMARY KEY ASC);
 export HISTDB=$HOME/.bashhistory.db
 shopt -s histappend
 
@@ -19,18 +19,18 @@ function historysaver() {
          return
     fi
 
-    export LINES COLUMNS
+    export LINES COLUMNS HOSTNAME
     # default
     line="${READLINE_POINT}"
-    BASH_PID=$$ HISTORY_LINE=$HISTCMD lua "$HISTORIANDIR"/luains.lua
+    BASH_PID=$$ HISTORY_LINE=$HISTCMD "$HISTORIANDIR"/luains.lua
 }
 
 function _history() {
-    if [ -z "$1" ]; then
-        builtin history
-        return
-    fi
-    lua "$HISTORIANDIR"/luaquery.lua "$@"
+    #if [ -z "$1" ]; then
+    #    builtin history
+    #    return
+    #fi
+    BASH_PID=$$ "$HISTORIANDIR"/luaquery.lua "$@"
 }
 
 bind -x '"\377": historysaver'
