@@ -11,7 +11,7 @@ unset HISTSIZE
 unset HISTTIMEFORMAT
 
 export TTY="$(readlink /dev/fd/0)"
-export SESSION_START="$(date +%s)"
+export SESSION_START="$(lua -e 'p = require("posix") print(p.stat("/proc/'$$'").ctime)')"
 
 function historysaver() {
     #historyhandler
