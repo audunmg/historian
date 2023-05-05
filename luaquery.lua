@@ -73,7 +73,7 @@ end
 local db = assert(sqlite3.open(assert(os.getenv('HISTDB')),sqlite3.OPEN_READONLY ))
 
 search = db:prepare([[
-SELECT (strftime("%s",time)) as time, command, pwd, return_value, duration_msec, ssh_connection, bash_pid, session_start,tty FROM bashhistory WHERE (command GLOB ?) ORDER BY time ASC
+SELECT (strftime("%s",time)) as time, command, pwd, return_value, duration_msec, ssh_connection, bash_pid, session_start,tty,hostname FROM bashhistory WHERE (command GLOB ?) ORDER BY time ASC
 ]])
 if (not (db:errcode() == 0)) then
     print(db:errmsg())
@@ -84,7 +84,7 @@ end
 
 if (#arg == 0) then
     search = db:prepare([[
-SELECT (strftime("%s",time)) as time, command, pwd, return_value, duration_msec, ssh_connection, bash_pid, session_start, history_lineno,tty FROM bashhistory WHERE (session_start IS ? AND bash_pid IS ?) ORDER BY time ASC
+SELECT (strftime("%s",time)) as time, command, pwd, return_value, duration_msec, ssh_connection, bash_pid, session_start, history_lineno,tty,hostname FROM bashhistory WHERE (session_start IS ? AND bash_pid IS ?) ORDER BY time ASC
     ]])
     search:bind_values(os.getenv('SESSION_START'), os.getenv('BASH_PID') )
 else
@@ -121,6 +121,9 @@ end
 
 for row in search:nrows() do
     if (params.powerline) then
+        if row.pwd == nil then
+            row.pwd = ''
+        end
     -- start powerline mode
         if row.ssh_connection then
             params.ssh = string.match(row.ssh_connection, "%g+")
@@ -144,6 +147,10 @@ for row in search:nrows() do
 
         -- segments which are modules
         modules = { "time", "duration", "ssh", "path", "exitcode" }
+        if row.hostname ~= nil and row.hostname ~= os.getenv('HOSTNAME') then
+            params.hostname = row.hostname
+            table.insert(modules, 2, 'hostname')
+        end
         for _, module in ipairs(modules) do
             mod = require("powerline." .. module)
             modsegments = mod.main(params)
