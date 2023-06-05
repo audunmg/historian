@@ -1,7 +1,7 @@
 #!/bin/bash
 
 
-# CREATE TABLE bashhistory( lines INTEGER, columns INTEGER, session_start INTEGER, bash_pid INTEGER, ssh_connection TEXT, hostname TEXT, tty TEXT, time REAL, command TEXT, history_lineno INTEGER, pwd TEXT, return_value INTEGER, duration_msec INTEGER, id INTEGER PRIMARY KEY ASC);
+# CREATE TABLE bashhistory( lines INTEGER, columns INTEGER, session_start INTEGER, bash_pid INTEGER, ssh_connection TEXT, tty TEXT, time REAL, command TEXT, pwd TEXT, return_value INTEGER, duration_msec INTEGER, id INTEGER PRIMARY KEY ASC, history_lineno INTEGER, hostname TEXT);
 export HISTDB=$HOME/.bashhistory.db
 shopt -s histappend
 
@@ -33,6 +33,7 @@ function _history() {
     BASH_PID=$$ "$HISTORIANDIR"/luaquery.lua "$@"
 }
 
+alias history=_history
 bind -x '"\377": historysaver'
 bind    'Control-m: "\xff\C-j"'
 bind    '"\C-j"':accept-line
