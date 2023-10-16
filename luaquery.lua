@@ -77,7 +77,7 @@ SELECT (strftime("%s",time)) as time, command, pwd, return_value, duration_msec,
 ]])
 if (not (db:errcode() == 0)) then
     print(db:errmsg())
-    return 1
+    os.exit(1)
 end
 
 
@@ -89,42 +89,63 @@ SELECT (strftime("%s",time)) as time, command, pwd, return_value, duration_msec,
     search:bind_values(os.getenv('SESSION_START'), os.getenv('BASH_PID') )
 else
     if (#arg == 1) then
+        if (arg[1] == '-c') or (arg[1] == '-d') then
+            print ("Clear or delete history not supported")
+            os.exit(2)
+        end
         query = arg[1]
-    else
-        if (#arg > 1) then
-            for k,v in ipairs(arg) do 
-                if (v == '-q') or (v == '--query') then
-                    query = arg[k+1]
+        if (arg[1] == '-p') then
+            search = db:prepare([[
+            SELECT (strftime('%s',time)) as time, command, pwd, return_value, duration_msec, ssh_connection, bash_pid, session_start, history_lineno,tty,hostname FROM bashhistory WHERE (pwd IS ?) ORDER BY time ASC
+            ]])
+            search:bind_values(os.getenv('PWD'))
+        else
+            if (#arg > 1) then
+                for k,v in ipairs(arg) do
+                    if (v == '-q') or (v == '--query') then
+                        query = arg[k+1]
+                    end
+                    if (v == '-s') or (v == '--sql-query') then
+                        sqlquery = arg[k+1]
+                    end
                 end
-                if (v == '-c') or (v == '-d') then
-                    print ("Clear or delete history not supported\n")
-                    return 0
+            end
+
+            if not sqlquery then
+                -- Dumb regex compatibility stuff
+                if not (string.sub(query, 1,1) == "^") then
+                    query = "*" .. query
+                else
+                    query = string.sub(query, 2,-1)
                 end
+                if not (string.sub(query, -1,-1) == "$") then
+                    query = query .. "*"
+                else
+                    query = string.sub(query, 1,-2)
+                end
+
+                search:bind_values(query)
+            end
+            if sqlquery then
+                search = db:prepare('SELECT (strftime("%s",time)) as time, command, pwd, return_value, duration_msec, ssh_connection, bash_pid, session_start, history_lineno,tty,hostname FROM bashhistory WHERE (' .. sqlquery .. ') ORDER BY time ASC;')
+
             end
         end
     end
-
-    -- Dumb regex compatibility stuff
-    if not (string.sub(query, 1,1) == "^") then
-        query = "*" .. query
-    else
-        query = string.sub(query, 2,-1)
-    end
-    if not (string.sub(query, -1,-1) == "$") then
-        query = query .. "*"
-    else
-        query = string.sub(query, 1,-2)
-    end
-
-    search:bind_values(query)
 end
 
+start_params = params
 for row in search:nrows() do
+    params.duration = nil
+    params.ssh = nil
+    params.exitcode = nil
+    params.hostname = nil
+
     if (params.powerline) then
         if row.pwd == nil then
             row.pwd = ''
         end
-    -- start powerline mode
+        -- start powerline mode
         if row.ssh_connection then
             params.ssh = string.match(row.ssh_connection, "%g+")
         end
