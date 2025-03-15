@@ -1,28 +1,4 @@
-# Dependencies:
-if !( command -v jq > /dev/null && command -v sqlite3 > /dev/null); then
-    echo "Missing deps"
-    exit 1;
-fi
-
-setup() {
-    load 'test_helper/bats-support/load'
-    load 'test_helper/bats-assert/load'
-
-    TEMP_DIR="$( mktemp -d tests.XXXXXXX )"
-    export HISTDB="$TEMP_DIR"/test.db
-}
-
-
-
-run_luains() {
-    export BASH_PID=$$
-    ./luains.lua $1
-}
-
-create_tables() {
-    run_luains setup
-    echo Created tables
-}
+source test/common-stuff.sh
 
 @test "Insert script runs" {
     run_luains
@@ -112,6 +88,3 @@ create_tables() {
 
  
 
-teardown() {
-    rm -r "$TEMP_DIR"
-}
