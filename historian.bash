@@ -1,29 +1,40 @@
 #!/bin/bash
 
 
-# CREATE TABLE bashhistory( lines INTEGER, columns INTEGER, session_start INTEGER, bash_pid INTEGER, ssh_connection TEXT, tty TEXT, time REAL, command TEXT, pwd TEXT, return_value INTEGER, duration_msec INTEGER, id INTEGER PRIMARY KEY ASC, history_lineno INTEGER, hostname TEXT);
-export HISTDB=$HOME/.bashhistory.db
-shopt -s histappend
+export HISTDB="${HISTDB:-$HOME/.bashhistory.db}"
+shopt -u histappend
 
 unset HISTFILE
 unset HISTFILESIZE
 unset HISTSIZE
 unset HISTTIMEFORMAT
 
-export TTY="$(readlink /dev/fd/0)"
-export SESSION_START="$(lua -e 'p = require("posix") print(p.stat("/proc/'$$'").ctime)')"
+#export TTY="$(readlink /dev/fd/0)"
+#export SESSION_START="$(lua -e 'p = require("posix") print(p.stat("/proc/'$$'").ctime)')"
+
+function _history_start_session() {
+    export TTY="${TTY:-$(readlink /dev/fd/0)}"
+    export SESSION_START="$(lua -e 'p = require("posix") print(p.stat("/proc/'$$'").ctime)')"
+    export BASH_PID=$$ 
+    "$HISTORIANDIR"/luains.lua session
+}
 
 function historysaver() {
     #historyhandler
     if [ -z "$READLINE_LINE"  ]; then
-         return
+        return
     fi
 
     export LINES COLUMNS HOSTNAME
     # default
     line="${READLINE_POINT}"
-    BASH_PID=$$ HISTORY_LINE=$HISTCMD "$HISTORIANDIR"/luains.lua
+    BASH_PID=$$ HISTORY_LINE=$HISTCMD "$HISTORIANDIR"/luains.lua insert
 }
+
+function _historian_update() {
+    BASH_PID=$$ ERRCODE="$1" DURATIONMILLISECONDS="$2" HISTORY_LINE="$3" "$HISTORIANDIR"/luains.lua update
+}
+
 
 function _history() {
     #if [ -z "$1" ]; then
@@ -32,6 +43,8 @@ function _history() {
     #fi
     BASH_PID=$$ "$HISTORIANDIR"/luaquery.lua "$@"
 }
+
+_history_start_session
 
 alias history=_history
 bind -x '"\377": historysaver'
