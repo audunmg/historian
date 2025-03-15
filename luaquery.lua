@@ -3,7 +3,7 @@ local os = require("os")
 local posix = require("posix")
 local sqlite3 = require("lsqlite3")
 
-
+--- This function checks if the session is still running:
 function bashpid(pid, session_start, tty)
     foreground = 232
     thisbackground  = 227
@@ -70,71 +70,88 @@ function reset()
         return "\27[0m"
 end
 
+function usage()
+    print(arg[0] .. " [-h] [-p] [-e regex-query] [-S SQL-query] [-r] [-s sort_col]")
+end
+
+function help()
+    usage()
+    print([[
+
+    -p                          Search for history in current directory (think pwd)
+    -e, --query regex-query     Search by matching command to regex-query
+    -S, --sql-query SQL-query   Search with custom SQL query
+    -r, --reverse               Reverse sorting
+    -s, --sort                  Sort by column
+    -h, --help                  This help
+
+    ]])
+end
+
 local db = assert(sqlite3.open(assert(os.getenv('HISTDB')),sqlite3.OPEN_READONLY ))
 
-search = db:prepare([[
-SELECT (strftime("%s",time)) as time, command, pwd, return_value, duration_msec, ssh_connection, bash_pid, session_start,tty,hostname FROM bashhistory WHERE (command GLOB ?) ORDER BY time ASC
-]])
 if (not (db:errcode() == 0)) then
     print(db:errmsg())
     os.exit(1)
 end
 
 
-
-if (#arg == 0) then
-    search = db:prepare([[
-SELECT (strftime("%s",time)) as time, command, pwd, return_value, duration_msec, ssh_connection, bash_pid, session_start, history_lineno,tty,hostname FROM bashhistory WHERE (session_start IS ? AND bash_pid IS ?) ORDER BY time ASC
-    ]])
-    search:bind_values(os.getenv('SESSION_START'), os.getenv('BASH_PID') )
-else
-    if (#arg == 1) then
-        if (arg[1] == '-c') or (arg[1] == '-d') then
-            print ("Clear or delete history not supported")
-            os.exit(2)
-        end
-        query = arg[1]
-        if (arg[1] == '-p') then
-            search = db:prepare([[
-            SELECT (strftime('%s',time)) as time, command, pwd, return_value, duration_msec, ssh_connection, bash_pid, session_start, history_lineno,tty,hostname FROM bashhistory WHERE (pwd IS ?) ORDER BY time ASC
-            ]])
-            search:bind_values(os.getenv('PWD'))
-        else
-            if (#arg > 1) then
-                for k,v in ipairs(arg) do
-                    if (v == '-q') or (v == '--query') then
-                        query = arg[k+1]
-                    end
-                    if (v == '-s') or (v == '--sql-query') then
-                        sqlquery = arg[k+1]
-                    end
-                end
-            end
-
-            if not sqlquery then
-                -- Dumb regex compatibility stuff
-                if not (string.sub(query, 1,1) == "^") then
-                    query = "*" .. query
-                else
-                    query = string.sub(query, 2,-1)
-                end
-                if not (string.sub(query, -1,-1) == "$") then
-                    query = query .. "*"
-                else
-                    query = string.sub(query, 1,-2)
-                end
-
-                search:bind_values(query)
-            end
-            if sqlquery then
-                search = db:prepare('SELECT (strftime("%s",time)) as time, command, pwd, return_value, duration_msec, ssh_connection, bash_pid, session_start, history_lineno,tty,hostname FROM bashhistory WHERE (' .. sqlquery .. ') ORDER BY time ASC;')
-
-            end
-        end
+search = ""
+search_names = {}
+search_expr = {}
+sort_order = "ASC"
+sort_by    = "time"
+for k,v in ipairs(arg) do
+    if (v == '-h') or (v == '--help') then
+        help()
+        os.exit(0)
+    elseif (v == '-c') or (v == '-d') then
+        usage()
+        print ("Clear or delete history not supported")
+        os.exit(2)
+    elseif (v == '-p') then
+        table.insert(search_expr, '(pwd IS :PWD)')
+        search_names['PWD'] = os.getenv('PWD')
+    elseif (v == '-e') or (v == '--query') then
+        query = assert(arg[k+1])
+        table.insert(search_expr, '(command REGEX :QUERY)')
+        search_names['QUERY'] = query
+    elseif (v == '-S') or (v == '--sql-query') then
+        sqlquery = assert(arg[k+1])
+        table.insert(search_expr, '('.. sqlquery ..')')
+    elseif (v == '-r') or (v == '--reverse') then
+        sort_order = "DESC"
+    elseif (v == '-s') or (v == '--sort') then
+        sort_by = assert(arg[k+1])
     end
 end
 
+if (#search_expr == 0) then
+    search_expr = {"session_start IS :session_start AND bash_pid IS :bash_pid"}
+    search_names = {session_start = os.getenv('SESSION_START'), bash_pid = os.getenv('BASH_PID')}
+end
+
+
+search = db:prepare([[
+                SELECT 
+                (strftime('%s',time)) as time,
+                command,
+                pwd,
+                return_value,
+                duration_msec,
+                ssh_connection,
+                bash_pid,
+                session_start,
+                history_lineno,
+                tty,
+                hostname FROM bashhistory LEFT JOIN bashsession USING (session_id) 
+                WHERE (]] .. table.concat(search_expr, " AND ") .. ") ORDER BY "..sort_by.." ".. sort_order ..";")
+assert(db:errcode(), db:errmsg())
+search:bind_names(search_names)
+assert(db:errcode(), db:errmsg())
+
 start_params = params
+
 for row in search:nrows() do
     params.duration = nil
     params.ssh = nil
