@@ -28,6 +28,6 @@ source test/common-stuff.sh
     export HISTORY_LINE=1
     # PWD is read by the insert, but is already defined so no need to mess
     run_luains insert
-    run ./luaquery.lua -q ^This
+    run ./luaquery.lua -e ^This
     assert_line --partial "This"
 }

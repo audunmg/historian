@@ -79,7 +79,7 @@ function help()
     print([[
 
     -p                          Search for history in current directory (think pwd)
-    -e, --query regex-query     Search by matching command to regex-query
+    -e, --query pattern-query   Search by matching command to a lua-pattern (almost regex)
     -S, --sql-query SQL-query   Search with custom SQL query
     -r, --reverse               Reverse sorting
     -s, --sort                  Sort by column
@@ -95,6 +95,14 @@ if (not (db:errcode() == 0)) then
     os.exit(1)
 end
 
+function lmatch(ctx,pat,str)
+    if string.match(str,pat) then
+        return ctx:result_number(1)
+    end
+    return ctx:result_null()
+end
+
+db:create_function('regexp',2,lmatch)
 
 search = ""
 search_names = {}
@@ -114,7 +122,7 @@ for k,v in ipairs(arg) do
         search_names['PWD'] = os.getenv('PWD')
     elseif (v == '-e') or (v == '--query') then
         query = assert(arg[k+1])
-        table.insert(search_expr, '(command REGEX :QUERY)')
+        table.insert(search_expr, '(command REGEXP :QUERY)')
         search_names['QUERY'] = query
     elseif (v == '-S') or (v == '--sql-query') then
         sqlquery = assert(arg[k+1])
@@ -132,7 +140,7 @@ if (#search_expr == 0) then
 end
 
 
-search = db:prepare([[
+stmt = [[
                 SELECT 
                 (strftime('%s',time)) as time,
                 command,
@@ -145,7 +153,10 @@ search = db:prepare([[
                 history_lineno,
                 tty,
                 hostname FROM bashhistory LEFT JOIN bashsession USING (session_id) 
-                WHERE (]] .. table.concat(search_expr, " AND ") .. ") ORDER BY "..sort_by.." ".. sort_order ..";")
+                WHERE ]] .. table.concat(search_expr, " AND ") .. " ORDER BY "..sort_by.." ".. sort_order ..";"
+
+search = db:prepare(stmt)
+assert(search, "Statement failed: "..stmt .."\nError:" ..db:errmsg())
 assert(db:errcode(), db:errmsg())
 search:bind_names(search_names)
 assert(db:errcode(), db:errmsg())
