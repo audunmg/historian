@@ -122,6 +122,7 @@ for k,v in ipairs(arg) do
         search_names['PWD'] = os.getenv('PWD')
     elseif (v == '-e') or (v == '--query') then
         query = assert(arg[k+1])
+        query = string.gsub(query,  "%-", "%%-")
         table.insert(search_expr, '(command REGEXP :QUERY)')
         search_names['QUERY'] = query
     elseif (v == '-S') or (v == '--sql-query') then
